@@ -16,7 +16,7 @@ jq -r '
     } | "\(.name)|\(.height)|\(.weight)|\(.type)"
 ' data.json |
 
-# Use awk to calculate actual height and weight (API provides values that need to be divided by 10)
+# Use awk to calculate actual height and weight
 awk -F'|' '{
     # Convert height from decimeters to meters
     height = $2 / 10
