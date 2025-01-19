@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Check if data.json exists
+if [ ! -f "data.json" ]; then
+    echo "Error: data.json not found. Please run the API request script first."
+    exit 1
+fi
+
+# Extract data using jq and format it
+# First, get the basic stats and first type
+jq -r '
+    {
+        name: .name,
+        height: .height,
+        weight: .weight,
+        type: .types[0].type.name
+    } | "\(.name)|\(.height)|\(.weight)|\(.type)"
+' data.json |
+
+# Use awk to calculate actual height and weight (API provides values that need to be divided by 10)
+awk -F'|' '{
+    # Convert height from decimeters to meters
+    height = $2 / 10
+    # Convert weight from hectograms to kilograms
+    weight = $3 / 10
+    # Capitalize first letter of name and type
+    name = toupper(substr($1,1,1)) substr($1,2)
+    type = toupper(substr($4,1,1)) substr($4,2)
+    # Print formatted string
+    printf "%s is of type %s, weighs %.0fkg, and is %.1fm tall.\n", 
+        name, type, weight, height
+}' |
+
+# Use sed to clean up any potential formatting issues
+sed 's/  / /g' # Remove any double spaces if they occur

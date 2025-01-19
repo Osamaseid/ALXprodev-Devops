@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Configuration
+DATA_DIR="pokemon_data"
+REPORT_FILE="pokemon_stats.csv"
+ERROR_LOG="summary_errors.txt"
+TEMP_FILE="temp_stats.txt"
+
+# Check if data directory exists
+if [ ! -d "$DATA_DIR" ]; then
+    echo "Error: Pokemon data directory not found. Please run the batch processing script first."
+    exit 1
+fi
+
+# Initialize files
+echo "Name,Height(m),Weight(kg)" > "$REPORT_FILE"
+> "$ERROR_LOG"
+
+# Process each JSON file and create CSV
+for file in "$DATA_DIR"/*.json; do
+    if [ -f "$file" ]; then
+        # Extract and format data using jq
+        jq -r '
+            . as $pokemon |
+            {
+                name: ($pokemon.name | ascii_upcase),
+                height: ($pokemon.height / 10),
+                weight: ($pokemon.weight / 10)
+            } |
+            [.name, .height, .weight] |
+            @csv
+        ' "$file" >> "$REPORT_FILE" 2>> "$ERROR_LOG"
+    fi
+done
+
+# Use sed to prepare data for calculation
+# Remove header, remove quotes, and format for processing
+sed '1d' "$REPORT_FILE" | \
+    sed 's/"//g' | \
+    sed 's/,/ /g' > "$TEMP_FILE"
+
+# Calculate averages using awk on the prepared data
+echo -e "\nCalculating statistics..."
+awk '
+    BEGIN {
+        total_height = 0
+        total_weight = 0
+        count = 0
+    }
+    {
+        total_height += $2
+        total_weight += $3
+        count++
+    }
+    END {
+        if (count > 0) {
+            avg_height = total_height / count
+            avg_weight = total_weight / count
+            
+            print "\nPokemon Statistics:"
+            printf "Number of Pokemon analyzed: %d\n", count
+            printf "Average Height: %.2f meters\n", avg_height
+            printf "Average Weight: %.2f kg\n", avg_weight
+            
+            # Save statistics to a separate section in the CSV
+            print "\nSummary Statistics" > "'$REPORT_FILE'"
+            printf "Average Height (m),%.2f\n", avg_height >> "'$REPORT_FILE'"
+            printf "Average Weight (kg),%.2f\n", avg_weight >> "'$REPORT_FILE'"
+        } else {
+            print "No data found to analyze"
+        }
+    }
+' "$TEMP_FILE"
+
+# Clean up temporary file
+rm -f "$TEMP_FILE"
+
+# Check for errors
+if [ -s "$ERROR_LOG" ]; then
+    echo -e "\nWarning: Some errors occurred during processing. Check $ERROR_LOG for details."
+else
+    rm "$ERROR_LOG"  # Remove empty error log
+fi
+
+# Display the first few lines of the report
+echo -e "\nGenerated Report Preview:"
+head -n 6 "$REPORT_FILE"
