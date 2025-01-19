@@ -7,7 +7,6 @@ if [ ! -f "data.json" ]; then
 fi
 
 # Extract data using jq and format it
-# First, get the basic stats and first type
 jq -r '
     {
         name: .name,
